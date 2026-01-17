@@ -16,7 +16,7 @@ services:
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw  # share X11 socket
       - ${XAUTHORITY}:${XAUTHORITY}
-      - ./ros2_ws/:/root/ros2_ws/            # workspace mounted
+      - ../:/root/ros2_ws/            # workspace mounted
     deploy:
       resources:
         reservations:
