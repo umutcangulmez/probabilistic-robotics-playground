@@ -17,6 +17,7 @@ RUN apt-get update && \
         ros-humble-ros-gz-image \
         ros-humble-foxglove-bridge \
         ros-humble-rviz2 \
+        ros-humble-rosbridge-server  \
         ros-humble-turtlebot3* \
         python3-colcon-common-extensions \
         git \
