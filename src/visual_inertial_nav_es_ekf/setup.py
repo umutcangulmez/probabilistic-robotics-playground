@@ -25,10 +25,10 @@ setup(
     entry_points={
         'console_scripts': [
             # executable_name = package.script_name:main_function
-            'visual_detector = src.visual_detector:main',
-            'es_ekf = src.es_ekf:main',
-            'trajectory_monitor = src.trajectory_monitor:main',
-            'vehicle_driver = src.vehicle_driver:main',
+            'visual_detector = visual_inertial_nav_es_ekf.visual_detector:main',
+            'es_ekf = visual_inertial_nav_es_ekf.es_ekf:main',
+            'trajectory_monitor = visual_inertial_nav_es_ekf.trajectory_monitor:main',
+            'vehicle_driver = visual_inertial_nav_es_ekf.vehicle_driver:main',
         ],
     },
 )
