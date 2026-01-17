@@ -1,21 +1,31 @@
-# ROS 2 Humble with Gazebo Fortress
+# ROS 2 Humble base
 FROM osrf/ros:humble-desktop-full
 
-# Install Gazebo Fortress + ROS 2 bridges and tools
+RUN apt-get update && apt-get install -y locales && \
+    locale-gen en_US en_US.UTF-8 && \
+    update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
+
+ENV LANG=en_US.UTF-8
+
+# Install Gazebo Fortress (Ignition Gazebo) + ROS 2 bridges
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        gazebo \
-        ros-humble-gazebo-ros-pkgs \
-        ros-humble-gazebo-ros2-control \
+        gz-fortress \
+        ros-humble-ros-gz \
+        ros-humble-ros-gz-bridge \
+        ros-humble-ros-gz-sim \
+        ros-humble-ros-gz-image \
+        ros-humble-foxglove-bridge \
         ros-humble-rviz2 \
         ros-humble-turtlebot3* \
         python3-colcon-common-extensions \
-        git && \
+        git \
+        gdb \
+        vim \
+        mlocate && \
     rm -rf /var/lib/apt/lists/*
 
 
-RUN apt-get update
-RUN apt-get install -y gdb vim
 RUN apt-get install -y mlocate
 RUN updatedb
 
@@ -23,9 +33,11 @@ RUN updatedb
 ENV TURTLEBOT3_MODEL=burger
 ENV DISPLAY=:0
 ENV QT_X11_NO_MITSHM=1
-ENV TURTLEBOT3_MODEL=burger
-ENV GAZEBO_MODEL_PATH="/usr/share/gazebo-11/models:/opt/ros/humble/share/turtlebot3_gazebo/models"
 
+# Gazebo Fortress environment variables
+ENV GZ_VERSION=fortress
+ENV GZ_SIM_SYSTEM_PLUGIN_PATH=/opt/ros/humble/lib
+ENV GZ_SIM_RESOURCE_PATH=/opt/ros/humble/share
 
 
 # Default work directory
