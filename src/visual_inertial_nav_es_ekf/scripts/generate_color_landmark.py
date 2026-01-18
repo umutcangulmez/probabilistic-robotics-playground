@@ -14,7 +14,7 @@ import random
 from typing import List, Tuple
 
 
-def generate_unique_colors(n: int, saturation: float = 1.0, value: float = 1.0, hue_range: int = 15) -> List[dict]:
+def generate_unique_colors(n: int, saturation: float = 1.0, value: float = 1.0, hue_range: int = 10) -> List[dict]:
     """
     Generate n unique, visually distinct colors using HSV color space.
 
@@ -173,193 +173,544 @@ def generate_landmark_sdf(
 """
 
 
-def generate_world_sdf(
-        num_landmarks: int,
-        min_radius: float = 4.0,
-        max_radius: float = 15.0,
-        seed: int = None,
-        landmark_height: float = 1.0,
-        landmark_radius: float = 0.2
-) -> Tuple[str, List[dict]]:
-    """
-    Generate complete SDF world file with landmarks.
-
-    Args:
-        num_landmarks: Number of landmarks to place
-        min_radius: Minimum distance from origin
-        max_radius: Maximum distance from origin
-        seed: Random seed for reproducibility
-        landmark_height: Height of landmark cylinders
-        landmark_radius: Radius of landmark cylinders
-
-    Returns:
-        Tuple of (SDF world file string, landmark data list)
-    """
-    positions = generate_landmark_positions(
-        num_landmarks, min_radius, max_radius, seed=seed
-    )
-
-    # Generate unique colors for all landmarks
-    colors = generate_unique_colors(num_landmarks)
-
-    # Generate landmark models and collect data for export
-    landmarks_sdf = ""
-    landmark_data = []
-
-    for i, (x, y) in enumerate(positions):
-        color = colors[i]
-        color_name = color["name"]
-        color_rgba = color["rgba"]
-
-        # Create unique name with index
-        name = f"{i}_{color_name}"
-        landmarks_sdf += generate_landmark_sdf(
-            name, x, y, color_name, color_rgba,
-            height=landmark_height, radius=landmark_radius
-        )
-
-        # Export data compatible with visual detector
-        landmark_data.append({
-            "id": i + 1,  # 1-indexed for detector compatibility
-            "name": color_name,
-            "x": round(x, 3),
-            "y": round(y, 3),
-            "z": round(landmark_height / 2, 3),
-            "rgb": color["rgb"],
-            "lower": [color["h_lower"], 100, 50],  # HSV lower bound
-            "upper": [color["h_upper"], 255, 255],  # HSV upper bound
-        })
-
-    # Build the complete world SDF
-    world_sdf = f'''<?xml version="1.0" ?>
-<sdf version="1.7">
-    <world name="project_world">
-        <physics name="1ms" type="ignored">
-            <max_step_size>0.001</max_step_size>
-            <real_time_factor>1.0</real_time_factor>
-        </physics>
-        <plugin
-            filename="libignition-gazebo-physics-system.so"
-            name="ignition::gazebo::systems::Physics">
-        </plugin>
-        <plugin
-            filename="libignition-gazebo-user-commands-system.so"
-            name="ignition::gazebo::systems::UserCommands">
-        </plugin>
-        <plugin
-            filename="libignition-gazebo-scene-broadcaster-system.so"
-            name="ignition::gazebo::systems::SceneBroadcaster">
-        </plugin>
-        <plugin filename="libignition-gazebo-imu-system.so"
-                name="ignition::gazebo::systems::Imu">
-        </plugin>
-        <plugin
-          filename="libignition-gazebo-sensors-system.so"
-          name="ignition::gazebo::systems::Sensors">
-          <render_engine>ogre2</render_engine>
-        </plugin>
-
-        <gui fullscreen="0">
-            <plugin filename="GzScene3D" name="3D View">
-                <ignition-gui>
-                <title>3D View</title>
-                <property type="bool" key="showTitleBar">false</property>
-                <property type="string" key="state">docked</property>
-                </ignition-gui>
-                <engine>ogre2</engine>
-                <scene>scene</scene>
-                <ambient_light>0.4 0.4 0.4</ambient_light>
-                <background_color>0.8 0.8 0.8</background_color>
-            </plugin>
-
-            <plugin filename="WorldControl" name="World control">
-                <ignition-gui>
-                <title>World control</title>
-                <property type="bool" key="showTitleBar">false</property>
-                <property type="bool" key="resizable">false</property>
-                <property type="double" key="height">72</property>
-                <property type="double" key="width">121</property>
-                <property type="double" key="z">1</property>
-                <property type="string" key="state">floating</property>
-                <anchors target="3D View">
-                    <line own="left" target="left"/>
-                    <line own="bottom" target="bottom"/>
-                </anchors>
-                </ignition-gui>
-                <play_pause>true</play_pause>
-                <step>true</step>
-                <start_paused>true</start_paused>
-                <service>/world/project_world/control</service>
-                <stats_topic>/world/project_world/stats</stats_topic>
-            </plugin>
-
-            <plugin filename="WorldStats" name="World stats">
-                <ignition-gui>
-                <title>World stats</title>
-                <property type="bool" key="showTitleBar">false</property>
-                <property type="bool" key="resizable">false</property>
-                <property type="double" key="height">110</property>
-                <property type="double" key="width">290</property>
-                <property type="double" key="z">1</property>
-                <property type="string" key="state">floating</property>
-                <anchors target="3D View">
-                    <line own="right" target="right"/>
-                    <line own="bottom" target="bottom"/>
-                </anchors>
-                </ignition-gui>
-                <sim_time>true</sim_time>
-                <real_time>true</real_time>
-                <real_time_factor>true</real_time_factor>
-                <iterations>true</iterations>
-                <topic>/world/project_world/stats</topic>
-            </plugin>
-
-            <plugin filename="EntityTree" name="Entity tree">
-            </plugin>
-        </gui>
-
-        <light type="directional" name="sun">
-            <cast_shadows>true</cast_shadows>
-            <pose>0 0 10 0 0 0</pose>
-            <diffuse>0.8 0.8 0.8 1</diffuse>
-            <specular>0.2 0.2 0.2 1</specular>
-            <attenuation>
-                <range>1000</range>
-                <constant>0.9</constant>
-                <linear>0.01</linear>
-                <quadratic>0.001</quadratic>
-            </attenuation>
-            <direction>-0.5 0.1 -0.9</direction>
-        </light>
-
-        <model name="ground_plane">
-            <static>true</static>
-            <link name="link">
-                <collision name="collision">
-                <geometry>
-                    <plane>
-                    <normal>0 0 1</normal>
-                    </plane>
-                </geometry>
-                </collision>
-                <visual name="visual">
-                <geometry>
-                    <plane>
-                    <normal>0 0 1</normal>
-                    <size>100 100</size>
-                    </plane>
-                </geometry>
-                <material>
-                    <ambient>0.8 0.8 0.8 1</ambient>
-                    <diffuse>0.8 0.8 0.8 1</diffuse>
-                    <specular>0.8 0.8 0.8 1</specular>
-                </material>
-                </visual>
+def generate_turtlebot3_waffle_sdf() -> str:
+    """Generate TurtleBot3 Waffle model with IMU and camera sensors (using simple shapes)."""
+    return """
+        <model name='turtlebot3_waffle' canonical_link='base_footprint'>
+            <pose>0 0 0 0 0 0</pose>
+            
+            <link name='base_footprint'>
+                <pose>0 0 0 0 0 0</pose>
+                <inertial>
+                    <mass>0.001</mass>
+                    <inertia>
+                        <ixx>0.0001</ixx><ixy>0</ixy><ixz>0</ixz>
+                        <iyy>0.0001</iyy><iyz>0</iyz><izz>0.0001</izz>
+                    </inertia>
+                </inertial>
             </link>
+            
+            <link name='base_link'>
+                <pose relative_to='base_footprint'>0 0 0.010 0 0 0</pose>
+                <inertial>
+                    <mass>1.3729096</mass>
+                    <inertia>
+                        <ixx>0.0117754808</ixx><ixy>0</ixy><ixz>0</ixz>
+                        <iyy>0.0117754808</iyy><iyz>0</iyz><izz>0.0184</izz>
+                    </inertia>
+                </inertial>
+                <!-- Main body - circular base -->
+                <visual name='base_visual'>
+                    <pose>0 0 0.047 0 0 0</pose>
+                    <geometry>
+                        <cylinder><radius>0.133</radius><length>0.094</length></cylinder>
+                    </geometry>
+                    <material>
+                        <ambient>0.1 0.1 0.1 1</ambient>
+                        <diffuse>0.1 0.1 0.1 1</diffuse>
+                    </material>
+                </visual>
+                <!-- Top plate -->
+                <visual name='top_plate_visual'>
+                    <pose>0 0 0.12 0 0 0</pose>
+                    <geometry>
+                        <cylinder><radius>0.133</radius><length>0.02</length></cylinder>
+                    </geometry>
+                    <material>
+                        <ambient>0.3 0.3 0.3 1</ambient>
+                        <diffuse>0.3 0.3 0.3 1</diffuse>
+                    </material>
+                </visual>
+                <collision name='base_collision'>
+                    <pose>0 0 0.047 0 0 0</pose>
+                    <geometry>
+                        <cylinder><radius>0.133</radius><length>0.094</length></cylinder>
+                    </geometry>
+                </collision>
+                
+                <!-- IMU Sensor -->
+                <sensor name='imu_sensor' type='imu'>
+                    <always_on>true</always_on>
+                    <update_rate>50</update_rate>
+                    <topic>imu</topic>
+                    <imu>
+                        <enable_orientation>false</enable_orientation>
+                        <angular_velocity>
+                            <x><noise type='gaussian'><mean>0</mean><stddev>0.0</stddev></noise></x>
+                            <y><noise type='gaussian'><mean>0</mean><stddev>0.0</stddev></noise></y>
+                            <z><noise type='gaussian'><mean>0</mean><stddev>0.0</stddev></noise></z>
+                        </angular_velocity>
+                        <linear_acceleration>
+                            <x><noise type='gaussian'><mean>0</mean><stddev>0.0</stddev></noise></x>
+                            <y><noise type='gaussian'><mean>0</mean><stddev>0.0</stddev></noise></y>
+                            <z><noise type='gaussian'><mean>0</mean><stddev>0.0</stddev></noise></z>
+                        </linear_acceleration>
+                    </imu>
+                </sensor>
+            </link>
+            
+            <!-- Camera Link -->
+            <link name='camera_link'>
+                <pose relative_to='base_link'>0.12 0 0.20 0 -0.15 0</pose>
+                <inertial>
+                    <mass>0.035</mass>
+                    <inertia>
+                        <ixx>0.00001</ixx><ixy>0</ixy><ixz>0</ixz>
+                        <iyy>0.00001</iyy><iyz>0</iyz><izz>0.00001</izz>
+                    </inertia>
+                </inertial>
+                <visual name='camera_visual'>
+                    <geometry>
+                        <box><size>0.02 0.06 0.02</size></box>
+                    </geometry>
+                    <material>
+                        <ambient>0.0 0.0 0.8 1</ambient>
+                        <diffuse>0.0 0.0 0.8 1</diffuse>
+                    </material>
+                </visual>
+                <sensor name='camera' type='camera'>
+                    <always_on>true</always_on>
+                    <update_rate>30</update_rate>
+                    <topic>camera/image</topic>
+                    <camera>
+                        <horizontal_fov>1.0472</horizontal_fov>
+                        <image>
+                            <width>640</width>
+                            <height>480</height>
+                            <format>R8G8B8</format>
+                        </image>
+                        <clip><near>0.1</near><far>100</far></clip>
+                    </camera>
+                </sensor>
+            </link>
+            
+            <!-- Left Wheel -->
+            <link name='wheel_left_link'>
+                <pose relative_to='base_link'>0 0.144 0.033 -1.5708 0 0</pose>
+                <inertial>
+                    <mass>0.1</mass>
+                    <inertia>
+                        <ixx>0.0001</ixx><ixy>0</ixy><ixz>0</ixz>
+                        <iyy>0.0001</iyy><iyz>0</iyz><izz>0.0001</izz>
+                    </inertia>
+                </inertial>
+                <visual name='wheel_left_visual'>
+                    <geometry>
+                        <cylinder><radius>0.033</radius><length>0.018</length></cylinder>
+                    </geometry>
+                    <material>
+                        <ambient>0.2 0.2 0.2 1</ambient>
+                        <diffuse>0.2 0.2 0.2 1</diffuse>
+                    </material>
+                </visual>
+                <collision name='wheel_left_collision'>
+                    <geometry>
+                        <cylinder><radius>0.033</radius><length>0.018</length></cylinder>
+                    </geometry>
+                    <surface>
+                        <friction>
+                            <ode><mu>1.0</mu><mu2>1.0</mu2></ode>
+                        </friction>
+                    </surface>
+                </collision>
+            </link>
+            
+            <!-- Right Wheel -->
+            <link name='wheel_right_link'>
+                <pose relative_to='base_link'>0 -0.144 0.033 -1.5708 0 0</pose>
+                <inertial>
+                    <mass>0.1</mass>
+                    <inertia>
+                        <ixx>0.0001</ixx><ixy>0</ixy><ixz>0</ixz>
+                        <iyy>0.0001</iyy><iyz>0</iyz><izz>0.0001</izz>
+                    </inertia>
+                </inertial>
+                <visual name='wheel_right_visual'>
+                    <geometry>
+                        <cylinder><radius>0.033</radius><length>0.018</length></cylinder>
+                    </geometry>
+                    <material>
+                        <ambient>0.2 0.2 0.2 1</ambient>
+                        <diffuse>0.2 0.2 0.2 1</diffuse>
+                    </material>
+                </visual>
+                <collision name='wheel_right_collision'>
+                    <geometry>
+                        <cylinder><radius>0.033</radius><length>0.018</length></cylinder>
+                    </geometry>
+                    <surface>
+                        <friction>
+                            <ode><mu>1.0</mu><mu2>1.0</mu2></ode>
+                        </friction>
+                    </surface>
+                </collision>
+            </link>
+            
+            <!-- Caster Wheels -->
+            <link name='caster_back_left_link'>
+                <pose relative_to='base_link'>-0.090 0.047 0.005 0 0 0</pose>
+                <inertial>
+                    <mass>0.01</mass>
+                    <inertia>
+                        <ixx>0.00001</ixx><ixy>0</ixy><ixz>0</ixz>
+                        <iyy>0.00001</iyy><iyz>0</iyz><izz>0.00001</izz>
+                    </inertia>
+                </inertial>
+                <visual name='caster_visual'>
+                    <geometry><sphere><radius>0.005</radius></sphere></geometry>
+                    <material>
+                        <ambient>0.2 0.2 0.2 1</ambient>
+                        <diffuse>0.2 0.2 0.2 1</diffuse>
+                    </material>
+                </visual>
+                <collision name='caster_collision'>
+                    <geometry><sphere><radius>0.005</radius></sphere></geometry>
+                    <surface>
+                        <friction><ode><mu>0.0</mu><mu2>0.0</mu2></ode></friction>
+                    </surface>
+                </collision>
+            </link>
+            
+            <link name='caster_back_right_link'>
+                <pose relative_to='base_link'>-0.090 -0.047 0.005 0 0 0</pose>
+                <inertial>
+                    <mass>0.01</mass>
+                    <inertia>
+                        <ixx>0.00001</ixx><ixy>0</ixy><ixz>0</ixz>
+                        <iyy>0.00001</iyy><iyz>0</iyz><izz>0.00001</izz>
+                    </inertia>
+                </inertial>
+                <visual name='caster_visual'>
+                    <geometry><sphere><radius>0.005</radius></sphere></geometry>
+                    <material>
+                        <ambient>0.2 0.2 0.2 1</ambient>
+                        <diffuse>0.2 0.2 0.2 1</diffuse>
+                    </material>
+                </visual>
+                <collision name='caster_collision'>
+                    <geometry><sphere><radius>0.005</radius></sphere></geometry>
+                    <surface>
+                        <friction><ode><mu>0.0</mu><mu2>0.0</mu2></ode></friction>
+                    </surface>
+                </collision>
+            </link>
+            
+            <!-- Joints -->
+            <joint name='base_joint' type='fixed'>
+                <parent>base_footprint</parent>
+                <child>base_link</child>
+            </joint>
+            
+            <joint name='camera_joint' type='fixed'>
+                <parent>base_link</parent>
+                <child>camera_link</child>
+            </joint>
+            
+            <joint name='wheel_left_joint' type='revolute'>
+                <parent>base_link</parent>
+                <child>wheel_left_link</child>
+                <axis>
+                    <xyz>0 0 1</xyz>
+                    <limit><lower>-1.79769e+308</lower><upper>1.79769e+308</upper></limit>
+                </axis>
+            </joint>
+            
+            <joint name='wheel_right_joint' type='revolute'>
+                <parent>base_link</parent>
+                <child>wheel_right_link</child>
+                <axis>
+                    <xyz>0 0 1</xyz>
+                    <limit><lower>-1.79769e+308</lower><upper>1.79769e+308</upper></limit>
+                </axis>
+            </joint>
+            
+            <joint name='caster_back_left_joint' type='ball'>
+                <parent>base_link</parent>
+                <child>caster_back_left_link</child>
+            </joint>
+            
+            <joint name='caster_back_right_joint' type='ball'>
+                <parent>base_link</parent>
+                <child>caster_back_right_link</child>
+            </joint>
+            
+            <!-- Diff Drive Plugin -->
+            <plugin filename='libignition-gazebo-diff-drive-system.so' name='ignition::gazebo::systems::DiffDrive'>
+                <left_joint>wheel_left_joint</left_joint>
+                <right_joint>wheel_right_joint</right_joint>
+                <wheel_separation>0.287</wheel_separation>
+                <wheel_radius>0.033</wheel_radius>
+                <odom_publish_frequency>30</odom_publish_frequency>
+                <topic>cmd_vel</topic>
+                <odom_topic>odom</odom_topic>
+                <frame_id>odom</frame_id>
+                <child_frame_id>base_footprint</child_frame_id>
+            </plugin>
         </model>
+"""
 
-        <!-- Generated Landmarks ({num_landmarks} total) -->
-{landmarks_sdf}
+
+def generate_turtlebot3_burger_sdf() -> str:
+    """Generate TurtleBot3 Burger model with IMU and camera sensors (using simple shapes)."""
+    return """
+        <model name='turtlebot3_burger' canonical_link='base_footprint'>
+            <pose>0 0 0 0 0 0</pose>
+            
+            <link name='base_footprint'>
+                <pose>0 0 0 0 0 0</pose>
+                <inertial>
+                    <mass>0.001</mass>
+                    <inertia>
+                        <ixx>0.0001</ixx><ixy>0</ixy><ixz>0</ixz>
+                        <iyy>0.0001</iyy><iyz>0</iyz><izz>0.0001</izz>
+                    </inertia>
+                </inertial>
+            </link>
+            
+            <link name='base_link'>
+                <pose relative_to='base_footprint'>0 0 0.010 0 0 0</pose>
+                <inertial>
+                    <mass>0.9</mass>
+                    <inertia>
+                        <ixx>0.0082</ixx><ixy>0</ixy><ixz>0</ixz>
+                        <iyy>0.0082</iyy><iyz>0</iyz><izz>0.0120</izz>
+                    </inertia>
+                </inertial>
+                <!-- Main body - circular base -->
+                <visual name='base_visual'>
+                    <pose>0 0 0.047 0 0 0</pose>
+                    <geometry>
+                        <cylinder><radius>0.07</radius><length>0.094</length></cylinder>
+                    </geometry>
+                    <material>
+                        <ambient>0.1 0.1 0.1 1</ambient>
+                        <diffuse>0.1 0.1 0.1 1</diffuse>
+                    </material>
+                </visual>
+                <!-- Top plates (stacked) -->
+                <visual name='top_plate1_visual'>
+                    <pose>0 0 0.10 0 0 0</pose>
+                    <geometry>
+                        <cylinder><radius>0.07</radius><length>0.01</length></cylinder>
+                    </geometry>
+                    <material>
+                        <ambient>0.3 0.3 0.3 1</ambient>
+                        <diffuse>0.3 0.3 0.3 1</diffuse>
+                    </material>
+                </visual>
+                <visual name='top_plate2_visual'>
+                    <pose>0 0 0.13 0 0 0</pose>
+                    <geometry>
+                        <cylinder><radius>0.07</radius><length>0.01</length></cylinder>
+                    </geometry>
+                    <material>
+                        <ambient>0.3 0.3 0.3 1</ambient>
+                        <diffuse>0.3 0.3 0.3 1</diffuse>
+                    </material>
+                </visual>
+                <collision name='base_collision'>
+                    <pose>0 0 0.070 0 0 0</pose>
+                    <geometry>
+                        <cylinder><radius>0.07</radius><length>0.140</length></cylinder>
+                    </geometry>
+                </collision>
+                
+                <!-- IMU Sensor -->
+                <sensor name='imu_sensor' type='imu'>
+                    <always_on>true</always_on>
+                    <update_rate>50</update_rate>
+                    <topic>imu</topic>
+                    <imu>
+                        <enable_orientation>false</enable_orientation>
+                        <angular_velocity>
+                            <x><noise type='gaussian'><mean>0</mean><stddev>0.0</stddev></noise></x>
+                            <y><noise type='gaussian'><mean>0</mean><stddev>0.0</stddev></noise></y>
+                            <z><noise type='gaussian'><mean>0</mean><stddev>0.0</stddev></noise></z>
+                        </angular_velocity>
+                        <linear_acceleration>
+                            <x><noise type='gaussian'><mean>0</mean><stddev>0.0</stddev></noise></x>
+                            <y><noise type='gaussian'><mean>0</mean><stddev>0.0</stddev></noise></y>
+                            <z><noise type='gaussian'><mean>0</mean><stddev>0.0</stddev></noise></z>
+                        </linear_acceleration>
+                    </imu>
+                </sensor>
+            </link>
+            
+            <!-- Camera Link (added for visual navigation) -->
+            <link name='camera_link'>
+                <pose relative_to='base_link'>0.15 0 0.30 0 0 0</pose>
+                <inertial>
+                    <mass>0.02</mass>
+                    <inertia>
+                        <ixx>0.00001</ixx><ixy>0</ixy><ixz>0</ixz>
+                        <iyy>0.00001</iyy><iyz>0</iyz><izz>0.00001</izz>
+                    </inertia>
+                </inertial>
+                <visual name='camera_visual'>
+                    <geometry>
+                        <box><size>0.015 0.030 0.020</size></box>
+                    </geometry>
+                    <material>
+                        <ambient>0.0 0.0 0.8 1</ambient>
+                        <diffuse>0.0 0.0 0.8 1</diffuse>
+                    </material>
+                </visual>
+                <sensor name='camera' type='camera'>
+                    <always_on>true</always_on>
+                    <update_rate>30</update_rate>
+                    <topic>camera/image</topic>
+                    <camera>
+                        <horizontal_fov>1.0472</horizontal_fov>
+                        <image>
+                            <width>640</width>
+                            <height>480</height>
+                            <format>R8G8B8</format>
+                        </image>
+                        <clip><near>0.1</near><far>100</far></clip>
+                    </camera>
+                </sensor>
+            </link>
+            
+            <!-- Left Wheel -->
+            <link name='wheel_left_link'>
+                <pose relative_to='base_link'>0 0.08 0.033 -1.5708 0 0</pose>
+                <inertial>
+                    <mass>0.05</mass>
+                    <inertia>
+                        <ixx>0.00001</ixx><ixy>0</ixy><ixz>0</ixz>
+                        <iyy>0.00001</iyy><iyz>0</iyz><izz>0.00001</izz>
+                    </inertia>
+                </inertial>
+                <visual name='wheel_left_visual'>
+                    <geometry>
+                        <cylinder><radius>0.033</radius><length>0.018</length></cylinder>
+                    </geometry>
+                    <material>
+                        <ambient>0.2 0.2 0.2 1</ambient>
+                        <diffuse>0.2 0.2 0.2 1</diffuse>
+                    </material>
+                </visual>
+                <collision name='wheel_left_collision'>
+                    <geometry>
+                        <cylinder><radius>0.033</radius><length>0.018</length></cylinder>
+                    </geometry>
+                    <surface>
+                        <friction>
+                            <ode><mu>1.0</mu><mu2>1.0</mu2></ode>
+                        </friction>
+                    </surface>
+                </collision>
+            </link>
+            
+            <!-- Right Wheel -->
+            <link name='wheel_right_link'>
+                <pose relative_to='base_link'>0 -0.08 0.033 -1.5708 0 0</pose>
+                <inertial>
+                    <mass>0.05</mass>
+                    <inertia>
+                        <ixx>0.00001</ixx><ixy>0</ixy><ixz>0</ixz>
+                        <iyy>0.00001</iyy><iyz>0</iyz><izz>0.00001</izz>
+                    </inertia>
+                </inertial>
+                <visual name='wheel_right_visual'>
+                    <geometry>
+                        <cylinder><radius>0.033</radius><length>0.018</length></cylinder>
+                    </geometry>
+                    <material>
+                        <ambient>0.2 0.2 0.2 1</ambient>
+                        <diffuse>0.2 0.2 0.2 1</diffuse>
+                    </material>
+                </visual>
+                <collision name='wheel_right_collision'>
+                    <geometry>
+                        <cylinder><radius>0.033</radius><length>0.018</length></cylinder>
+                    </geometry>
+                    <surface>
+                        <friction>
+                            <ode><mu>1.0</mu><mu2>1.0</mu2></ode>
+                        </friction>
+                    </surface>
+                </collision>
+            </link>
+            
+            <!-- Caster Ball -->
+            <link name='caster_link'>
+                <pose relative_to='base_link'>-0.045 0 0.005 0 0 0</pose>
+                <inertial>
+                    <mass>0.01</mass>
+                    <inertia>
+                        <ixx>0.00001</ixx><ixy>0</ixy><ixz>0</ixz>
+                        <iyy>0.00001</iyy><iyz>0</iyz><izz>0.00001</izz>
+                    </inertia>
+                </inertial>
+                <visual name='caster_visual'>
+                    <geometry><sphere><radius>0.005</radius></sphere></geometry>
+                    <material>
+                        <ambient>0.2 0.2 0.2 1</ambient>
+                        <diffuse>0.2 0.2 0.2 1</diffuse>
+                    </material>
+                </visual>
+                <collision name='caster_collision'>
+                    <geometry><sphere><radius>0.005</radius></sphere></geometry>
+                    <surface>
+                        <friction><ode><mu>0.0</mu><mu2>0.0</mu2></ode></friction>
+                    </surface>
+                </collision>
+            </link>
+            
+            <!-- Joints -->
+            <joint name='base_joint' type='fixed'>
+                <parent>base_footprint</parent>
+                <child>base_link</child>
+            </joint>
+            
+            <joint name='camera_joint' type='fixed'>
+                <parent>base_link</parent>
+                <child>camera_link</child>
+            </joint>
+            
+            <joint name='wheel_left_joint' type='revolute'>
+                <parent>base_link</parent>
+                <child>wheel_left_link</child>
+                <axis>
+                    <xyz>0 0 1</xyz>
+                    <limit><lower>-1.79769e+308</lower><upper>1.79769e+308</upper></limit>
+                </axis>
+            </joint>
+            
+            <joint name='wheel_right_joint' type='revolute'>
+                <parent>base_link</parent>
+                <child>wheel_right_link</child>
+                <axis>
+                    <xyz>0 0 1</xyz>
+                    <limit><lower>-1.79769e+308</lower><upper>1.79769e+308</upper></limit>
+                </axis>
+            </joint>
+            
+            <joint name='caster_joint' type='ball'>
+                <parent>base_link</parent>
+                <child>caster_link</child>
+            </joint>
+            
+            <!-- Diff Drive Plugin -->
+            <plugin filename='libignition-gazebo-diff-drive-system.so' name='ignition::gazebo::systems::DiffDrive'>
+                <left_joint>wheel_left_joint</left_joint>
+                <right_joint>wheel_right_joint</right_joint>
+                <wheel_separation>0.160</wheel_separation>
+                <wheel_radius>0.033</wheel_radius>
+                <odom_publish_frequency>30</odom_publish_frequency>
+                <topic>cmd_vel</topic>
+                <odom_topic>odom</odom_topic>
+                <frame_id>odom</frame_id>
+                <child_frame_id>base_footprint</child_frame_id>
+            </plugin>
+        </model>
+"""
+
+
+def generate_vehicle_blue_sdf() -> str:
+    """Generate the original vehicle_blue model."""
+    return """
         <model name='vehicle_blue' canonical_link='chassis'>
             <pose relative_to='world'>0.0 0.0 0 0 0 0</pose>
             <frame name="lidar_frame" attached_to='chassis'>
@@ -591,7 +942,215 @@ def generate_world_sdf(
                 <odom_publish_frequency>1</odom_publish_frequency>
                 <topic>vehicle_blue/cmd_vel</topic>
             </plugin>
-        </model>    
+        </model>
+"""
+
+
+def get_robot_sdf(robot_type: str) -> str:
+    """Get robot SDF based on type."""
+    if robot_type == "vehicle_blue":
+        return generate_vehicle_blue_sdf()
+    elif robot_type == "turtlebot3_waffle":
+        return generate_turtlebot3_waffle_sdf()
+    elif robot_type == "turtlebot3_burger":
+        return generate_turtlebot3_burger_sdf()
+    elif robot_type == "none":
+        return ""
+    else:
+        return generate_vehicle_blue_sdf()
+
+
+def generate_world_sdf(
+        num_landmarks: int,
+        min_radius: float = 4.0,
+        max_radius: float = 15.0,
+        seed: int = None,
+        landmark_height: float = 1.0,
+        landmark_radius: float = 0.2,
+        robot: str = "vehicle_blue"
+) -> Tuple[str, List[dict]]:
+    """
+    Generate complete SDF world file with landmarks.
+
+    Args:
+        num_landmarks: Number of landmarks to place
+        min_radius: Minimum distance from origin
+        max_radius: Maximum distance from origin
+        seed: Random seed for reproducibility
+        landmark_height: Height of landmark cylinders
+        landmark_radius: Radius of landmark cylinders
+        robot: Robot model to include ("vehicle_blue", "turtlebot3_waffle", "turtlebot3_burger", "none")
+
+    Returns:
+        Tuple of (SDF world file string, landmark data list)
+    """
+    positions = generate_landmark_positions(
+        num_landmarks, min_radius, max_radius, seed=seed
+    )
+
+    # Generate unique colors for all landmarks
+    colors = generate_unique_colors(num_landmarks)
+
+    # Generate landmark models and collect data for export
+    landmarks_sdf = ""
+    landmark_data = []
+
+    for i, (x, y) in enumerate(positions):
+        color = colors[i]
+        color_name = color["name"]
+        color_rgba = color["rgba"]
+
+        # Create unique name with index
+        name = f"{i}_{color_name}"
+        landmarks_sdf += generate_landmark_sdf(
+            name, x, y, color_name, color_rgba,
+            height=landmark_height, radius=landmark_radius
+        )
+
+        # Export data compatible with visual detector
+        # Use lower S/V thresholds to handle Gazebo lighting variations
+        landmark_data.append({
+            "id": i + 1,  # 1-indexed for detector compatibility
+            "name": color_name,
+            "x": round(x, 3),
+            "y": round(y, 3),
+            "z": round(landmark_height / 2, 3),
+            "rgb": color["rgb"],
+            "lower": [color["h_lower"], 50, 30],   # HSV lower bound (relaxed S, V)
+            "upper": [color["h_upper"], 255, 255],  # HSV upper bound
+        })
+
+    # Build the complete world SDF
+    world_sdf = f'''<?xml version="1.0" ?>
+<sdf version="1.7">
+    <world name="project_world">
+        <physics name="1ms" type="ignored">
+            <max_step_size>0.001</max_step_size>
+            <real_time_factor>1.0</real_time_factor>
+        </physics>
+        <plugin
+            filename="libignition-gazebo-physics-system.so"
+            name="ignition::gazebo::systems::Physics">
+        </plugin>
+        <plugin
+            filename="libignition-gazebo-user-commands-system.so"
+            name="ignition::gazebo::systems::UserCommands">
+        </plugin>
+        <plugin
+            filename="libignition-gazebo-scene-broadcaster-system.so"
+            name="ignition::gazebo::systems::SceneBroadcaster">
+        </plugin>
+        <plugin filename="libignition-gazebo-imu-system.so"
+                name="ignition::gazebo::systems::Imu">
+        </plugin>
+        <plugin
+          filename="libignition-gazebo-sensors-system.so"
+          name="ignition::gazebo::systems::Sensors">
+          <render_engine>ogre2</render_engine>
+        </plugin>
+
+        <gui fullscreen="0">
+            <plugin filename="GzScene3D" name="3D View">
+                <ignition-gui>
+                <title>3D View</title>
+                <property type="bool" key="showTitleBar">false</property>
+                <property type="string" key="state">docked</property>
+                </ignition-gui>
+                <engine>ogre2</engine>
+                <scene>scene</scene>
+                <ambient_light>0.4 0.4 0.4</ambient_light>
+                <background_color>0.8 0.8 0.8</background_color>
+            </plugin>
+
+            <plugin filename="WorldControl" name="World control">
+                <ignition-gui>
+                <title>World control</title>
+                <property type="bool" key="showTitleBar">false</property>
+                <property type="bool" key="resizable">false</property>
+                <property type="double" key="height">72</property>
+                <property type="double" key="width">121</property>
+                <property type="double" key="z">1</property>
+                <property type="string" key="state">floating</property>
+                <anchors target="3D View">
+                    <line own="left" target="left"/>
+                    <line own="bottom" target="bottom"/>
+                </anchors>
+                </ignition-gui>
+                <play_pause>true</play_pause>
+                <step>true</step>
+                <start_paused>true</start_paused>
+                <service>/world/project_world/control</service>
+                <stats_topic>/world/project_world/stats</stats_topic>
+            </plugin>
+
+            <plugin filename="WorldStats" name="World stats">
+                <ignition-gui>
+                <title>World stats</title>
+                <property type="bool" key="showTitleBar">false</property>
+                <property type="bool" key="resizable">false</property>
+                <property type="double" key="height">110</property>
+                <property type="double" key="width">290</property>
+                <property type="double" key="z">1</property>
+                <property type="string" key="state">floating</property>
+                <anchors target="3D View">
+                    <line own="right" target="right"/>
+                    <line own="bottom" target="bottom"/>
+                </anchors>
+                </ignition-gui>
+                <sim_time>true</sim_time>
+                <real_time>true</real_time>
+                <real_time_factor>true</real_time_factor>
+                <iterations>true</iterations>
+                <topic>/world/project_world/stats</topic>
+            </plugin>
+
+            <plugin filename="EntityTree" name="Entity tree">
+            </plugin>
+        </gui>
+
+        <light type="directional" name="sun">
+            <cast_shadows>true</cast_shadows>
+            <pose>0 0 10 0 0 0</pose>
+            <diffuse>0.8 0.8 0.8 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <attenuation>
+                <range>1000</range>
+                <constant>0.9</constant>
+                <linear>0.01</linear>
+                <quadratic>0.001</quadratic>
+            </attenuation>
+            <direction>-0.5 0.1 -0.9</direction>
+        </light>
+
+        <model name="ground_plane">
+            <static>true</static>
+            <link name="link">
+                <collision name="collision">
+                <geometry>
+                    <plane>
+                    <normal>0 0 1</normal>
+                    </plane>
+                </geometry>
+                </collision>
+                <visual name="visual">
+                <geometry>
+                    <plane>
+                    <normal>0 0 1</normal>
+                    <size>100 100</size>
+                    </plane>
+                </geometry>
+                <material>
+                    <ambient>0.8 0.8 0.8 1</ambient>
+                    <diffuse>0.8 0.8 0.8 1</diffuse>
+                    <specular>0.8 0.8 0.8 1</specular>
+                </material>
+                </visual>
+            </link>
+        </model>
+
+        <!-- Generated Landmarks ({num_landmarks} total) -->
+{landmarks_sdf}
+{get_robot_sdf(robot)}
     </world>
 </sdf>
 '''
@@ -650,6 +1209,18 @@ def main():
         default=None,
         help="Export landmark positions to JSON file (for EKF ground truth)"
     )
+    parser.add_argument(
+        "--no-robot",
+        action="store_true",
+        help="Don't include robot in world (spawn separately via launch file)"
+    )
+    parser.add_argument(
+        "--robot",
+        type=str,
+        choices=["vehicle_blue", "turtlebot3_waffle", "turtlebot3_burger", "none"],
+        default="vehicle_blue",
+        help="Robot model to include (default: vehicle_blue)"
+    )
 
     args = parser.parse_args()
 
@@ -657,19 +1228,24 @@ def main():
     if args.seed is not None:
         random.seed(args.seed)
 
+    # Handle --no-robot flag
+    robot_type = "none" if args.no_robot else args.robot
+
     world_sdf, landmark_data = generate_world_sdf(
         num_landmarks=args.num_landmarks,
         min_radius=args.min_radius,
         max_radius=args.max_radius,
         seed=args.seed,
         landmark_height=args.landmark_height,
-        landmark_radius=args.landmark_radius
+        landmark_radius=args.landmark_radius,
+        robot=robot_type
     )
 
     with open(args.output, "w") as f:
         f.write(world_sdf)
 
-    print(f"Generated world with {args.num_landmarks} landmarks: {args.output}")
+    robot_msg = f" with {robot_type}" if robot_type != "none" else " (no robot)"
+    print(f"Generated world with {args.num_landmarks} landmarks{robot_msg}: {args.output}")
 
     # Export landmark map if requested
     if args.export_map:
