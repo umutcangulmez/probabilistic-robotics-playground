@@ -6,5 +6,11 @@ ros2 run teleop_twist_keyboard teleop_twist_keyboard --ros-args -r cmd_vel:=/veh
 
 ign gazebo -r project_world.sdf
 
-ros2 launch foxglove_bridge foxglove_birdge_launch.xml
+ros2 launch foxglove_bridge foxglove_bridge_launch.xml
 
+
+
+
+
+colcon build --packages-select ekf_experiment
+ros2 launch ekf_experiment experiment.launch.py scenarios:="['high_imu_noise']" num_runs:=1

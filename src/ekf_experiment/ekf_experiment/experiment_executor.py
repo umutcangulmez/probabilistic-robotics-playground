@@ -405,7 +405,7 @@ class ExperimentExecutor(Node):
                 break
 
             # Send velocity command
-            twist = self.trajectory.get_command(elapsed)
+            twist = self.trajectory.get_command(elapsed) # todo accel limits
             self.cmd_vel_pub.publish(twist)
             # Collect ground truth
             self.collect_ground_truth()
@@ -422,7 +422,7 @@ class ExperimentExecutor(Node):
         self.get_logger().info(f"  Experiment finished after {elapsed:.1f}s")
         self.get_logger().info(f"  GT samples: {len(self.metrics.gt_positions)}, EST samples: {len(self.metrics.est_positions)}")
 
-    # Compute metrics
+        # Compute metrics
         results = self.metrics.compute_metrics()
 
         if results:
