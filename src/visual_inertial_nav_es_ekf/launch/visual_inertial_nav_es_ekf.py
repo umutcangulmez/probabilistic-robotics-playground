@@ -23,18 +23,24 @@ def generate_launch_description():
                 # Clock
                 '/clock@rosgraph_msgs/msg/Clock@gz.msgs.Clock',
                 # Ground Truth Odometry (For Validation)
-                '/model/vehicle_blue/odometry@nav_msgs/msg/Odometry@gz.msgs.Odometry',
+                '/model/turtlebot3_waffle/odometry@nav_msgs/msg/Odometry@gz.msgs.Odometry',
                 # TF (Internal model parts)
-                '/model/vehicle_blue/tf@tf2_msgs/msg/TFMessage@gz.msgs.Pose_V',
+                '/model/turtlebot3_waffle/tf@tf2_msgs/msg/TFMessage@gz.msgs.Pose_V',
                 # IMU
-                '/vehicle_blue/imu@sensor_msgs/msg/Imu@gz.msgs.IMU',
+                '/imu@sensor_msgs/msg/Imu@gz.msgs.IMU',
                 # Camera
-                '/vehicle_blue/camera/image@sensor_msgs/msg/Image@gz.msgs.Image',
+                '/camera/image@sensor_msgs/msg/Image@gz.msgs.Image',
                 # Command Velocity
-                '/vehicle_blue/cmd_vel@geometry_msgs/msg/Twist@gz.msgs.Twist',
+                '/cmd_vel@geometry_msgs/msg/Twist@gz.msgs.Twist',
+                # Odometry from diff drive
+                '/odom@nav_msgs/msg/Odometry@gz.msgs.Odometry',
             ],
             remappings=[
-                ('/model/vehicle_blue/tf', '/tf'),
+                ('/model/turtlebot3_waffle/tf', '/tf'),
+                # Remap to legacy topic names for your existing nodes
+                ('/imu', '/vehicle_blue/imu'),
+                ('/camera/image', '/vehicle_blue/camera/image'),
+                ('/cmd_vel', '/vehicle_blue/cmd_vel'),
             ],
             output='screen'
         ),
