@@ -1,81 +1,292 @@
+#!/usr/bin/env python3
 """
-Range + Bearing Visual Detector (Fixed)
+Visual Detector Node with Camera-Based Detection
+
+Two modes:
+1. COLOR: Detects colored cylinders (red, green, blue, yellow)
+2. ARUCO: Detects ArUco markers
+
+Publishes range and bearing measurements to detected landmarks.
 """
+
 import rclpy
 from rclpy.node import Node
-from rclpy.duration import Duration
-from rclpy.time import Time
-import tf2_ros
-import tf2_geometry_msgs
+from sensor_msgs.msg import Image
 from geometry_msgs.msg import PointStamped
+from cv_bridge import CvBridge
+import cv2
 import numpy as np
 import math
+
 
 class VisualDetector(Node):
     def __init__(self):
         super().__init__('visual_detector')
-        
-        # Parameters
-        self.fov = 1.0472 
-        self.max_range = 20.0
-        self.camera_offset_x = 1.0
-        
-        self.bearing_stddev = 0.05
-        self.range_stddev = 0.1
-        
-        self.landmarks = {
-            1: {'pos': [6.0, 6.0, 0.5],  'name': 'Red'},
-            2: {'pos': [6.0, -6.0, 0.5], 'name': 'Green'},
-            3: {'pos': [10.0, 0.0, 0.5], 'name': 'Blue'},
-            4: {'pos': [0.0, 8.0, 0.5],  'name': 'Yellow'}
-        }
-        
-        self.tf_buffer = tf2_ros.Buffer(cache_time=Duration(seconds=2.0))
-        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
-        self.pub = self.create_publisher(PointStamped, '/visual_measurement', 10)
-        self.create_timer(1.0/30.0, self.timer_callback)
 
-    def timer_callback(self):
+        # --- Parameters ---
+        self.declare_parameter('mode', 'color')  # 'color' or 'aruco'
+        self.declare_parameter('fov', 1.0472)  # 60 degrees
+        self.declare_parameter('image_width', 640)
+        self.declare_parameter('image_height', 480)
+        self.declare_parameter('noise_bearing', 0.02)
+        self.declare_parameter('noise_range', 0.05)
+        self.declare_parameter('known_landmark_height', 1.0)  # meters
+        self.declare_parameter('camera_height', 0.4)  # meters from ground
+
+        self.mode = self.get_parameter('mode').value
+        self.fov = self.get_parameter('fov').value
+        self.img_width = self.get_parameter('image_width').value
+        self.img_height = self.get_parameter('image_height').value
+        self.noise_bearing = self.get_parameter('noise_bearing').value
+        self.noise_range = self.get_parameter('noise_range').value
+        self.landmark_height = self.get_parameter('known_landmark_height').value
+        self.camera_height = self.get_parameter('camera_height').value
+
+        # Focal length from FOV
+        self.fx = self.img_width / (2 * math.tan(self.fov / 2))
+        self.fy = self.fx  # Assuming square pixels
+        self.cx = self.img_width / 2
+        self.cy = self.img_height / 2
+
+        # Color ranges in HSV for landmark detection
+        # Format: {landmark_id: {'name': str, 'lower': array, 'upper': array}}
+        self.color_landmarks = {
+            # H: Color, S: Color Intensity (Keep High!), V: Brightness (Allow Low for shade)
+            1: {'name': 'Red',    'lower': np.array([0, 100, 50]),   'upper': np.array([10, 255, 255])},
+            2: {'name': 'Green',  'lower': np.array([55, 100, 50]),  'upper': np.array([65, 255, 255])},
+            3: {'name': 'Blue',   'lower': np.array([115, 100, 50]), 'upper': np.array([125, 255, 255])},
+            4: {'name': 'Yellow', 'lower': np.array([25, 100, 50]),  'upper': np.array([35, 255, 255])},
+        }
+
+        # Red wraps around in HSV
+        self.red_upper_lower = np.array([170, 50, 50])
+        self.red_upper_upper = np.array([180, 100, 100])
+
+        # ArUco setup
+        if self.mode == 'aruco':
+            self.aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
+            self.aruco_params = cv2.aruco.DetectorParameters()
+            self.aruco_detector = cv2.aruco.ArucoDetector(self.aruco_dict, self.aruco_params)
+            self.marker_size = 0.2  # meters
+
+        # CV Bridge
+        self.bridge = CvBridge()
+
+        # Subscriber
+        self.image_sub = self.create_subscription(
+            Image, '/vehicle_blue/camera/image', self.image_callback, 10
+        )
+
+        # Publisher
+        self.measurement_pub = self.create_publisher(PointStamped, '/visual_measurement', 10)
+
+        # Debug image publisher (optional)
+        self.debug_pub = self.create_publisher(Image, '/visual_detector/debug_image', 10)
+
+        self.get_logger().info(f"Visual Detector initialized in '{self.mode}' mode")
+        self.get_logger().info(f"  FOV: {math.degrees(self.fov):.1f}°, Resolution: {self.img_width}x{self.img_height}")
+
+    def image_callback(self, msg: Image):
+        # Convert ROS Image to OpenCV
         try:
-            trans = self.tf_buffer.lookup_transform('vehicle_blue/chassis', 'world', Time())
-        except tf2_ros.TransformException:
+            cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+        except Exception as e:
+            self.get_logger().error(f"CV Bridge error: {e}")
             return
 
-        for lm_id, data in self.landmarks.items():
-            lm_point = PointStamped()
-            lm_point.header.frame_id = 'world'
-            lm_point.point.x = data['pos'][0]
-            lm_point.point.y = data['pos'][1]
-            lm_point.point.z = data['pos'][2]
+        if self.mode == 'color':
+            self.detect_color_landmarks(cv_image, msg.header.stamp)
+        elif self.mode == 'aruco':
+            self.detect_aruco_markers(cv_image, msg.header.stamp)
 
-            try:
-                lm_in_chassis = self.tf_buffer.transform(lm_point, 'vehicle_blue/chassis')
-            except tf2_ros.TransformException:
-                continue
+    def detect_color_landmarks(self, image, stamp):
+        """Detect colored cylinder landmarks"""
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        debug_image = image.copy()
 
-            # Vector from Camera to Landmark (in Body Frame)
-            dx = lm_in_chassis.point.x - self.camera_offset_x
-            dy = lm_in_chassis.point.y 
-            
-            dist = math.sqrt(dx*dx + dy*dy)
-            # Standard definition: Positive = Left
-            bearing = math.atan2(dy, dx)
+        # DEBUG: Print HSV value at center of image
+        h, w = hsv.shape[:2]
+        center_hsv = hsv[h//2, w//2]
+        self.get_logger().info(f"Center HSV: {center_hsv}", throttle_duration_sec=1.0)
 
-            if dist < self.max_range and dist > 0.5 and abs(bearing) < (self.fov / 2.0):
-                meas_bearing = bearing + np.random.normal(0, self.bearing_stddev)
-                meas_range = dist + np.random.normal(0, self.range_stddev)
-                meas_range = max(0.1, meas_range)
+        for lm_id, color_info in self.color_landmarks.items():
+            # Create mask
+            mask = cv2.inRange(hsv, color_info['lower'], color_info['upper'])
 
-                msg = PointStamped()
-                msg.header.stamp = self.get_clock().now().to_msg()
-                msg.header.frame_id = 'vehicle_blue/camera_frame'
-                msg.point.x = float(meas_bearing)
-                msg.point.y = float(meas_range)
-                msg.point.z = float(lm_id)
-                
-                self.pub.publish(msg)
+            # Special handling for red (wraps around HSV)
+            if lm_id == 1:
+                mask_upper = cv2.inRange(hsv, self.red_upper_lower, self.red_upper_upper)
+                mask = cv2.bitwise_or(mask, mask_upper)
+
+            # Morphological operations to clean up
+            kernel = np.ones((5, 5), np.uint8)
+            # specific "close" operation fills gaps inside the object
+            mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+            # followed by dilate to ensure we get the edges
+            mask = cv2.dilate(mask, kernel, iterations=2)
+
+            # Find contours
+            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+            if contours:
+                # Get largest contour
+                largest = max(contours, key=cv2.contourArea)
+                area = cv2.contourArea(largest)
+
+                # Filter by minimum area
+                if area < 100:
+                    continue
+
+                # Get bounding box
+                # (cx_blob, cy_blob), radius = cv2.minEnclosingCircle(largest)
+                # x = int(cx_blob - radius)
+                # y = int(cy_blob - radius)
+                # w = h = int(2 * radius)
+                # if w > h * 1.2:
+                #     self.get_logger().info(f"Ignored wide blob (Shadow?): {color_info['name']} w={w} h={h}")
+                #     continue
+                # center_x = cx_blob
+                # center_y = cy_blob
+                # # Center of detection
+                # center_x = x + w / 2
+                # center_y = y + h / 2
+                x, y, w, h = cv2.boundingRect(largest)
+
+                # Calculate centers from the bounding box
+                center_x = x + w / 2.0
+                center_y = y + h / 2.0
+                # Calculate bearing from pixel position
+                bearing = self.pixel_to_bearing(center_x)
+
+                # Estimate range from apparent height
+                range_est = self.estimate_range_from_height(h)
+                self.get_logger().info(
+                    f"{color_info['name']}: center=({center_x:.0f},{center_y:.0f}), w={w}, h={h}, area={area}",
+                    throttle_duration_sec=0.5)
+                if range_est is None or range_est > 20.0 or range_est < 0.5:
+                    continue
+
+                # Add noise
+                noisy_bearing = bearing + np.random.normal(0, self.noise_bearing)
+                noisy_range = range_est + np.random.normal(0, self.noise_range)
+                noisy_range = max(0.1, noisy_range)
+
+                # Publish measurement
+                self.publish_measurement(noisy_bearing, noisy_range, lm_id, stamp)
+
+                # Draw on debug image
+                cv2.rectangle(debug_image, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                cv2.putText(debug_image, f"{color_info['name']} r={range_est:.1f}m",
+                            (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                blob_hsv = hsv[int(center_y), int(center_x)]
+                self.get_logger().info(
+                    f"{color_info['name']}: HSV at center = {blob_hsv}, bbox h={h}",
+                    throttle_duration_sec=0.5
+                )
+                self.get_logger().info(
+                    f"Detected {color_info['name']}: bearing={math.degrees(bearing):.1f}°, range={range_est:.2f}m"
+                )
+
+        # Publish debug image
+        self.publish_debug_image(debug_image, stamp)
+
+    def detect_aruco_markers(self, image, stamp):
+        """Detect ArUco markers"""
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        debug_image = image.copy()
+
+        corners, ids, rejected = self.aruco_detector.detectMarkers(gray)
+
+        if ids is not None:
+            cv2.aruco.drawDetectedMarkers(debug_image, corners, ids)
+
+            for i, marker_id in enumerate(ids.flatten()):
+                # Get corner points
+                corner = corners[i][0]
+
+                # Center of marker
+                center_x = np.mean(corner[:, 0])
+                center_y = np.mean(corner[:, 1])
+
+                # Calculate bearing
+                bearing = self.pixel_to_bearing(center_x)
+
+                # Estimate range from marker size
+                marker_width_pixels = np.linalg.norm(corner[0] - corner[1])
+                range_est = self.estimate_range_from_marker_size(marker_width_pixels)
+
+                if range_est is None or range_est > 20.0 or range_est < 0.5:
+                    continue
+
+                # Add noise
+                noisy_bearing = bearing + np.random.normal(0, self.noise_bearing)
+                noisy_range = range_est + np.random.normal(0, self.noise_range)
+                noisy_range = max(0.1, noisy_range)
+
+                # Publish measurement (marker_id as landmark_id)
+                self.publish_measurement(noisy_bearing, noisy_range, int(marker_id), stamp)
+
+                cv2.putText(debug_image, f"ID:{marker_id} r={range_est:.1f}m",
+                            (int(center_x), int(center_y) - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+                self.get_logger().info(
+                    f"Detected ArUco {marker_id}: bearing={math.degrees(bearing):.1f}°, range={range_est:.2f}m"
+                )
+
+        # Publish debug image
+        self.publish_debug_image(debug_image, stamp)
+
+    def pixel_to_bearing(self, pixel_x):
+        """Convert pixel x-coordinate to bearing angle"""
+        # Bearing = 0 at center, positive = left, negative = right
+        return math.atan2(self.cx - pixel_x, self.fx)
+
+    def estimate_range_from_height(self, pixel_height):
+        """Estimate range from apparent height of landmark"""
+        if pixel_height < 5:
+            return None
+        # range = (real_height * focal_length) / pixel_height
+        return (self.landmark_height * self.fy) / pixel_height
+    def estimate_range_from_width(self, pixel_width):
+        """Estimate range from apparent width of landmark (diameter)"""
+        if pixel_width < 5:
+            return None
+        cylinder_diameter = 0.4  # meters - adjust to match your world file
+        return (cylinder_diameter * self.fx) / pixel_width
+    def estimate_range_from_marker_size(self, pixel_width):
+        """Estimate range from ArUco marker apparent size"""
+        if pixel_width < 5:
+            return None
+        return (self.marker_size * self.fx) / pixel_width
+
+    def publish_measurement(self, bearing, range_val, landmark_id, stamp):
+        """Publish visual measurement"""
+        msg = PointStamped()
+        msg.header.stamp = stamp
+        msg.header.frame_id = 'vehicle_blue/camera_frame'
+        msg.point.x = float(bearing)
+        msg.point.y = float(range_val)
+        msg.point.z = float(landmark_id)
+        self.measurement_pub.publish(msg)
+
+    def publish_debug_image(self, image, stamp):
+        """Publish debug image for visualization"""
+        try:
+            debug_msg = self.bridge.cv2_to_imgmsg(image, encoding='bgr8')
+            debug_msg.header.stamp = stamp
+            self.debug_pub.publish(debug_msg)
+        except Exception as e:
+            self.get_logger().error(f"Debug image publish error: {e}")
+
 
 def main():
     rclpy.init()
-    rclpy.spin(VisualDetector())
+    node = VisualDetector()
+    rclpy.spin(node)
+    node.destroy_node()
     rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()
