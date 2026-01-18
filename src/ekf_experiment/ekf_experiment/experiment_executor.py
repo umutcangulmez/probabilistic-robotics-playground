@@ -244,7 +244,10 @@ class ExperimentExecutor(Node):
     def __init__(self):
         super().__init__('experiment_executor')
         self.ekf_msg = None
-
+        self.gt_msg = None
+        self.gt_sub = self.create_subscription(
+            Odometry, '/model/vehicle_blue/odometry', self.gt_callback, 50
+        )
         # Parameters
         self.declare_parameter('scenarios', ['baseline'])
         self.declare_parameter('num_runs', 1)
@@ -283,6 +286,17 @@ class ExperimentExecutor(Node):
         # Start experiments after a delay
         self.create_timer(2.0, self.start_experiments, callback_group=None)
         self._experiments_started = False
+    # def gt_callback(self, msg: Odometry):
+    #     self.gt_msg = msg
+    def gt_callback(self, msg: Odometry):
+        # Normalize quaternion to have positive w
+        q = msg.pose.pose.orientation
+        if q.w < 0:
+            msg.pose.pose.orientation.x = -q.x
+            msg.pose.pose.orientation.y = -q.y
+            msg.pose.pose.orientation.z = -q.z
+            msg.pose.pose.orientation.w = -q.w
+        self.gt_msg = msg
 
     def ekf_callback(self, msg: Odometry):
         """Collect EKF estimates"""
@@ -329,29 +343,25 @@ class ExperimentExecutor(Node):
             self.metrics.add_estimate(t, pos, quat, None)
 
     def collect_ground_truth(self):
-        """Get ground truth from TF"""
-        try:
-            trans = self.tf_buffer.lookup_transform(
-                'world', 'vehicle_blue/chassis', Time(), timeout=Duration(seconds=0.1)
-            )
-            t = time.time()  # Use wall clock time
+        """Get ground truth from odometry topic"""
+        if self.gt_msg is None:
+            return
 
-            pos = np.array([
-                trans.transform.translation.x,
-                trans.transform.translation.y,
-                trans.transform.translation.z
-            ])
-            quat = np.array([
-                trans.transform.rotation.x,
-                trans.transform.rotation.y,
-                trans.transform.rotation.z,
-                trans.transform.rotation.w
-            ])
+        msg = self.gt_msg
+        t = time.time()
+        pos = np.array([
+            msg.pose.pose.position.x,
+            msg.pose.pose.position.y,
+            msg.pose.pose.position.z
+        ])
+        quat = np.array([
+            msg.pose.pose.orientation.x,
+            msg.pose.pose.orientation.y,
+            msg.pose.pose.orientation.z,
+            msg.pose.pose.orientation.w
+        ])
 
-            self.metrics.add_ground_truth(t, pos, quat)
-
-        except tf2_ros.TransformException as e:
-            self.get_logger().warn(f'TF lookup failed: {e}', throttle_duration_sec=5.0)
+        self.metrics.add_ground_truth(t, pos, quat)
 
     def start_experiments(self):
         """Start running experiments"""
