@@ -85,7 +85,8 @@ def generate_launch_description():
             package='visual_inertial_nav_es_ekf',
             executable='visual_detector',
             name='visual_detector',
-            parameters=[{'use_sim_time': use_sim_time}],
+            parameters=[{'use_sim_time': use_sim_time,
+                         'landmarks_file': landmarks_path}],
             output='screen'
         ),
 
