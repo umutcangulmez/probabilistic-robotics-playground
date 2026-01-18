@@ -54,7 +54,7 @@ class VisualDetector(Node):
         self.declare_parameter('noise_bearing', 0.02)
         self.declare_parameter('noise_range', 0.05)
         self.declare_parameter('known_landmark_height', 1.0)  # meters
-        self.declare_parameter('camera_height', 0.4)  # meters from ground
+        self.declare_parameter('camera_height', 0.15)  # meters from ground
 
         self.mode = self.get_parameter('mode').value
         self.fov = self.get_parameter('fov').value
