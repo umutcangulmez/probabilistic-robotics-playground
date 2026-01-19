@@ -49,8 +49,8 @@ class VisualDetector(Node):
         # --- Parameters ---
         self.declare_parameter('mode', 'color')  # 'color' or 'aruco'
         self.declare_parameter('fov', 1.0472)  # 60 degrees
-        self.declare_parameter('image_width', 640)
-        self.declare_parameter('image_height', 480)
+        self.declare_parameter('image_width', 320)
+        self.declare_parameter('image_height', 240)
         self.declare_parameter('noise_bearing', 0.02)
         self.declare_parameter('noise_range', 0.05)
         self.declare_parameter('known_landmark_height', 1.0)  # meters
@@ -146,6 +146,12 @@ class VisualDetector(Node):
 
         # DEBUG: Print HSV value at center of image
         h, w = hsv.shape[:2]
+        # for y_pct in [0.3, 0.5, 0.7]:
+        #     for x_pct in [0.25, 0.5, 0.75]:
+        #         py, px = int(h * y_pct), int(w * x_pct)
+        #         hsv_val = hsv[py, px]
+        #         cv2.circle(debug_image, (px, py), 5, (255, 255, 255), -1)
+        #         self.get_logger().info(f"HSV at ({px},{py}): {hsv_val}", throttle_duration_sec=2.0)
         center_hsv = hsv[h//2, w//2]
         self.get_logger().info(f"Center HSV: {center_hsv}", throttle_duration_sec=1.0)
 
@@ -223,59 +229,13 @@ class VisualDetector(Node):
                     f"{color_info['name']}: HSV at center = {blob_hsv}, bbox h={h}",
                     throttle_duration_sec=0.5
                 )
-                self.get_logger().info(
-                    f"Detected {color_info['name']}: bearing={math.degrees(bearing):.1f}°, range={range_est:.2f}m"
-                )
+                # self.get_logger().info(
+                #     f"Detected {color_info['name']}: bearing={math.degrees(bearing):.1f}°, range={range_est:.2f}m"
+                # )
 
         # Publish debug image
         self.publish_debug_image(debug_image, stamp)
 
-    def detect_aruco_markers(self, image, stamp):
-        """Detect ArUco markers"""
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        debug_image = image.copy()
-
-        corners, ids, rejected = self.aruco_detector.detectMarkers(gray)
-
-        if ids is not None:
-            cv2.aruco.drawDetectedMarkers(debug_image, corners, ids)
-
-            for i, marker_id in enumerate(ids.flatten()):
-                # Get corner points
-                corner = corners[i][0]
-
-                # Center of marker
-                center_x = np.mean(corner[:, 0])
-                center_y = np.mean(corner[:, 1])
-
-                # Calculate bearing
-                bearing = self.pixel_to_bearing(center_x)
-
-                # Estimate range from marker size
-                marker_width_pixels = np.linalg.norm(corner[0] - corner[1])
-                range_est = self.estimate_range_from_marker_size(marker_width_pixels)
-
-                if range_est is None or range_est > 20.0 or range_est < 0.5:
-                    continue
-
-                # Add noise
-                noisy_bearing = bearing + np.random.normal(0, self.noise_bearing)
-                noisy_range = range_est + np.random.normal(0, self.noise_range)
-                noisy_range = max(0.1, noisy_range)
-
-                # Publish measurement (marker_id as landmark_id)
-                self.publish_measurement(noisy_bearing, noisy_range, int(marker_id), stamp)
-
-                cv2.putText(debug_image, f"ID:{marker_id} r={range_est:.1f}m",
-                            (int(center_x), int(center_y) - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-
-                self.get_logger().info(
-                    f"Detected ArUco {marker_id}: bearing={math.degrees(bearing):.1f}°, range={range_est:.2f}m"
-                )
-
-        # Publish debug image
-        self.publish_debug_image(debug_image, stamp)
 
     def pixel_to_bearing(self, pixel_x):
         """Convert pixel x-coordinate to bearing angle"""
