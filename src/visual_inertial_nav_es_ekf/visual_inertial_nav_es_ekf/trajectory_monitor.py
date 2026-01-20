@@ -23,6 +23,7 @@ import tf2_ros
 from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import Path, Odometry
 from std_msgs.msg import Float64
+from collections import deque
 
 
 class TrajectoryMonitor(Node):
@@ -35,6 +36,7 @@ class TrajectoryMonitor(Node):
         self.declare_parameter('ekf_topic', '/ekf_odom')
         self.declare_parameter('path_max_len', 5000)
         self.declare_parameter('nees_window', 100)  # Window for running NEES average
+        self.ekf_buffer = deque(maxlen=100)  # Store recent EKF poses
 
         self.target_frame = self.get_parameter('target_frame').value
         self.gt_frame = self.get_parameter('gt_frame').value
@@ -75,11 +77,47 @@ class TrajectoryMonitor(Node):
         
         # Last EKF covariance (for NEES)
         self.last_P_pos = None
+        self.create_timer(0.1, self.process_matches)
 
         self.create_timer(5.0, self.report_stats)
         self.get_logger().info("Trajectory Monitor initialized (with NEES). Waiting for EKF data...")
 
+
     def ekf_callback(self, odom_msg: Odometry):
+        """Just buffer the EKF message"""
+        self.ekf_buffer.append(odom_msg)
+    def process_matches(self):
+        """Match buffered EKF poses with available TF"""
+        while self.ekf_buffer:
+            odom_msg = self.ekf_buffer[0]
+            ekf_time = Time.from_msg(odom_msg.header.stamp)
+
+            # Check if TF is available for this timestamp
+            try:
+                if self.tf_buffer.can_transform(
+                        self.target_frame,
+                        self.gt_frame,
+                        ekf_time,
+                        timeout=Duration(seconds=0.0)
+                ):
+                    # TF available - process this message
+                    self.ekf_buffer.popleft()
+                    self._process_matched_pose(odom_msg)
+                else:
+                    # TF not yet available - check if it's too old
+                    now = self.get_clock().now()
+                    age = (now - ekf_time).nanoseconds / 1e9
+
+                    if age > 1.0:  # Older than 1 second, skip it
+                        self.ekf_buffer.popleft()
+                        self.fallback_count += 1
+                    else:
+                        # Wait for TF to arrive
+                        break
+            except tf2_ros.TransformException:
+                self.ekf_buffer.popleft()
+                break
+    def _process_matched_pose(self, odom_msg: Odometry):
         # 1. Get EKF Position
         pos_est = odom_msg.pose.pose.position
         
