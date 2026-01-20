@@ -15,12 +15,11 @@ def generate_launch_description():
 
     ROBOT_NAME = 'turtlebot3_waffle'
 
-    # Gazebo topics
     gz_tf_topic = f'/model/{ROBOT_NAME}/tf'
-    gz_gt_odom_topic = f'/model/{ROBOT_NAME}/odometry'
+    gz_gt_odom_topic = f'/odom'
     gz_imu_topic = '/imu'
     gz_camera_topic = '/camera/image'
-    gz_cmd_vel_topic = '/cmd_vel'
+    gz_cmd_vel_topic = f'/cmd_vel'
 
     # TF frames
     gt_frame = f'{ROBOT_NAME}/base_footprint'
@@ -34,42 +33,26 @@ def generate_launch_description():
         # 1) Launch Arguments
         # ================================================================
         DeclareLaunchArgument('use_sim_time', default_value='true'),
-        DeclareLaunchArgument('enable_smoother', default_value='false'),
-        DeclareLaunchArgument('enable_teleop', default_value='true'),
+        DeclareLaunchArgument('enable_smoother', default_value='true'),
+        DeclareLaunchArgument('enable_teleop', default_value='false'),
 
         # ================================================================
-        # 2a) CRITICAL BRIDGE (Clock, TF, Odom, IMU, Cmd_vel)
-        #     *Removed Camera from here to prevent clock lag*
+        # 2) Gazebo <-> ROS 2 Bridge
         # ================================================================
         Node(
             package='ros_gz_bridge',
             executable='parameter_bridge',
-            name='ros_gz_bridge_core',
+            name='ros_gz_bridge',
             arguments=[
                 '/clock@rosgraph_msgs/msg/Clock@gz.msgs.Clock',
                 f'{gz_gt_odom_topic}@nav_msgs/msg/Odometry@gz.msgs.Odometry',
                 f'{gz_tf_topic}@tf2_msgs/msg/TFMessage@gz.msgs.Pose_V',
                 f'{gz_imu_topic}@sensor_msgs/msg/Imu@gz.msgs.IMU',
+                f'{gz_camera_topic}@sensor_msgs/msg/Image@gz.msgs.Image',
                 f'{gz_cmd_vel_topic}@geometry_msgs/msg/Twist@gz.msgs.Twist',
             ],
             remappings=[
                 (gz_tf_topic, '/tf'),
-                (gz_imu_topic, '/vehicle_blue/imu'),
-            ],
-            output='screen'
-        ),
-
-        # ================================================================
-        # 2b) IMAGE BRIDGE (Dedicated for high bandwidth)
-        #     *Uses ros_gz_image for optimized transport*
-        # ================================================================
-        Node(
-            package='ros_gz_image',
-            executable='image_bridge',
-            name='ros_gz_image_bridge',
-            arguments=[gz_camera_topic],
-            remappings=[
-                (gz_camera_topic, '/vehicle_blue/camera/image')
             ],
             output='screen'
         ),
@@ -81,7 +64,7 @@ def generate_launch_description():
             package='tf2_ros',
             executable='static_transform_publisher',
             name='static_map_to_world',
-            arguments=['0', '0', '0', '0', '0', '0', '1', 'map', 'world'],
+            arguments=['0', '0', '0', '0', '0', '0', '1', 'map', 'odom'],
             output='screen',
         ),
         Node(
@@ -93,7 +76,7 @@ def generate_launch_description():
         ),
 
         # ================================================================
-        # 4) Keyboard Teleop
+        # 4) Keyboard Teleop (optional)
         # ================================================================
         Node(
             package='visual_inertial_nav_es_ekf',
@@ -101,9 +84,6 @@ def generate_launch_description():
             name='keyboard_teleop',
             condition=IfCondition(enable_teleop),
             parameters=[{'use_sim_time': use_sim_time}],
-            remappings=[
-                ('/cmd_vel_raw', gz_cmd_vel_topic),
-            ],
             output='screen'
         ),
 
@@ -131,7 +111,7 @@ def generate_launch_description():
         ),
 
         # ================================================================
-        # 6) Visual Detector
+        # 6) Visual Detector (Camera-Based)
         # ================================================================
         Node(
             package='visual_inertial_nav_es_ekf',
@@ -139,30 +119,42 @@ def generate_launch_description():
             name='visual_detector',
             parameters=[{
                 'use_sim_time': use_sim_time,
-                'landmarks_file': landmarks_path,
-                'known_landmark_height': 1.0,
-                'camera_height': 0.20,
+                'mode': 'color',  # 'color' or 'aruco'
+                'camera_topic': gz_camera_topic,  # /camera from SDF
+                'fov': 1.085,
+                'image_width': 1280,  # From SDF
+                'image_height': 720,  # From SDF
+                'noise_bearing': 0.0,  # rad
+                'noise_range': 0.0,    # m
+                'known_landmark_height': 1.0,  # 1.0m cylinders from SDF
+                'known_landmark_diameter': 0.4,  # 0.2m radius = 0.4m diameter
+                'camera_height': 0.103,  # 0.010 (base) + 0.093 (camera_link z)
+                'landmarks_file': landmarks_path,   # Empty = use defaults matching SDF
+                'min_contour_area': 100,
+                'max_range': 20.0,
+                'min_range': 0.5,
             }],
             output='screen'
         ),
 
         # ================================================================
-        # 7) ES-EKF
+        # 7) ES-EKF (Improved Version - No Outlier Rejection)
         # ================================================================
         Node(
             package='visual_inertial_nav_es_ekf',
-            executable='es_ekf',
+            executable='es_ekf',  # Update entry point in setup.py
             name='es_ekf_node',
             parameters=[{
                 'use_sim_time': use_sim_time,
+                'imu_topic': gz_imu_topic,
+                'odom_frame_id': 'odom',
+                'base_frame_id': 'base_footprint',
                 'landmarks_file': landmarks_path,
-                'imu_topic': '/vehicle_blue/imu',
-                'odom_frame_id': 'world',
-                'base_frame_id': gt_frame,
 
-                'imu_downsample_factor': 3,
+                # IMU processing
                 'filter_alpha': 0.35,
 
+                # Stationarity detection
                 'acc_enter_threshold': 0.15,
                 'acc_exit_threshold': 0.30,
                 'gyro_enter_threshold': 0.02,
@@ -170,22 +162,27 @@ def generate_launch_description():
                 'velocity_zupt_threshold': 0.05,
                 'stationary_samples_required': 15,
 
-                'sigma_a': 0.1,
-                'sigma_w': 0.01,
-                'sigma_ab': 1e-4,
-                'sigma_wb': 1e-5,
+                # Process noise - increased for better motion tracking
+                # These are BASE values; they get scaled up during motion
+                'sigma_a': 0.15,    # accelerometer noise [m/s^2]
+                'sigma_w': 0.02,    # gyroscope noise [rad/s]
+                'sigma_ab': 1e-4,   # accel bias drift
+                'sigma_wb': 1e-5,   # gyro bias drift
 
-                'R_range': 0.01,
-                'R_bearing': 0.0025,
+                # Measurement noise
+                'R_range': 0.25,    # range variance [m^2] (0.05m std)
+                'R_bearing': 0.01,   # bearing variance [rad^2] (~0.03rad std)
                 'sigma_zupt': 0.02,
 
+                # Initial position (robot starts at origin)
                 'init_x': 0.0,
                 'init_y': 0.0,
                 'init_z': 0.0,
 
-                'cam_offset_x': 0.12,
+                # Camera offset (must match visual_detector)
+                'cam_offset_x': 0.10,
                 'cam_offset_y': 0.0,
-                'cam_offset_z': 0.20,
+                'cam_offset_z': 0.0,
             }],
             output='screen'
         ),

@@ -127,7 +127,7 @@
 
         <!-- Generated Landmarks (10 total) -->
 
-        <model name='landmark_0_color_061'>
+        <model name='landmark_0_color_000'>
             <static>true</static>
             <pose>-1.284 9.280 0.500 0 0 0</pose>
             <link name='link'>
@@ -139,8 +139,8 @@
                         </cylinder>
                     </geometry>
                     <material>
-                        <ambient>0.967 1.000 0.000 1</ambient>
-                        <diffuse>0.967 1.000 0.000 1</diffuse>
+                        <ambient>1.000 0.000 0.000 1</ambient>
+                        <diffuse>1.000 0.000 0.000 1</diffuse>
                     </material>
                 </visual>
                 <collision name='collision'>
@@ -154,7 +154,7 @@
             </link>
         </model>
 
-        <model name='landmark_1_color_284'>
+        <model name='landmark_1_color_018'>
             <static>true</static>
             <pose>6.726 3.802 0.500 0 0 0</pose>
             <link name='link'>
@@ -166,8 +166,8 @@
                         </cylinder>
                     </geometry>
                     <material>
-                        <ambient>0.741 0.000 1.000 1</ambient>
-                        <diffuse>0.741 0.000 1.000 1</diffuse>
+                        <ambient>1.000 0.600 0.000 1</ambient>
+                        <diffuse>1.000 0.600 0.000 1</diffuse>
                     </material>
                 </visual>
                 <collision name='collision'>
@@ -181,7 +181,7 @@
             </link>
         </model>
 
-        <model name='landmark_2_color_146'>
+        <model name='landmark_2_color_036'>
             <static>true</static>
             <pose>3.703 1.809 0.500 0 0 0</pose>
             <link name='link'>
@@ -193,8 +193,8 @@
                         </cylinder>
                     </geometry>
                     <material>
-                        <ambient>0.000 1.000 0.450 1</ambient>
-                        <diffuse>0.000 1.000 0.450 1</diffuse>
+                        <ambient>1.000 1.000 0.000 1</ambient>
+                        <diffuse>1.000 1.000 0.000 1</diffuse>
                     </material>
                 </visual>
                 <collision name='collision'>
@@ -208,7 +208,7 @@
             </link>
         </model>
 
-        <model name='landmark_3_color_009'>
+        <model name='landmark_3_color_054'>
             <static>true</static>
             <pose>-1.118 5.175 0.500 0 0 0</pose>
             <link name='link'>
@@ -220,8 +220,8 @@
                         </cylinder>
                     </geometry>
                     <material>
-                        <ambient>1.000 0.158 0.000 1</ambient>
-                        <diffuse>1.000 0.158 0.000 1</diffuse>
+                        <ambient>0.400 1.000 0.000 1</ambient>
+                        <diffuse>0.400 1.000 0.000 1</diffuse>
                     </material>
                 </visual>
                 <collision name='collision'>
@@ -235,7 +235,7 @@
             </link>
         </model>
 
-        <model name='landmark_4_color_231'>
+        <model name='landmark_4_color_072'>
             <static>true</static>
             <pose>-4.557 11.293 0.500 0 0 0</pose>
             <link name='link'>
@@ -247,8 +247,8 @@
                         </cylinder>
                     </geometry>
                     <material>
-                        <ambient>0.000 0.134 1.000 1</ambient>
-                        <diffuse>0.000 0.134 1.000 1</diffuse>
+                        <ambient>0.000 1.000 0.200 1</ambient>
+                        <diffuse>0.000 1.000 0.200 1</diffuse>
                     </material>
                 </visual>
                 <collision name='collision'>
@@ -262,7 +262,7 @@
             </link>
         </model>
 
-        <model name='landmark_5_color_094'>
+        <model name='landmark_5_color_090'>
             <static>true</static>
             <pose>10.601 2.423 0.500 0 0 0</pose>
             <link name='link'>
@@ -274,8 +274,8 @@
                         </cylinder>
                     </geometry>
                     <material>
-                        <ambient>0.426 1.000 0.000 1</ambient>
-                        <diffuse>0.426 1.000 0.000 1</diffuse>
+                        <ambient>0.000 1.000 1.000 1</ambient>
+                        <diffuse>0.000 1.000 1.000 1</diffuse>
                     </material>
                 </visual>
                 <collision name='collision'>
@@ -289,7 +289,7 @@
             </link>
         </model>
 
-        <model name='landmark_6_color_316'>
+        <model name='landmark_6_color_108'>
             <static>true</static>
             <pose>8.428 9.561 0.500 0 0 0</pose>
             <link name='link'>
@@ -301,8 +301,8 @@
                         </cylinder>
                     </geometry>
                     <material>
-                        <ambient>1.000 0.000 0.718 1</ambient>
-                        <diffuse>1.000 0.000 0.718 1</diffuse>
+                        <ambient>0.000 0.400 1.000 1</ambient>
+                        <diffuse>0.000 0.400 1.000 1</diffuse>
                     </material>
                 </visual>
                 <collision name='collision'>
@@ -316,7 +316,7 @@
             </link>
         </model>
 
-        <model name='landmark_7_color_179'>
+        <model name='landmark_7_color_126'>
             <static>true</static>
             <pose>-0.517 -6.300 0.500 0 0 0</pose>
             <link name='link'>
@@ -328,8 +328,8 @@
                         </cylinder>
                     </geometry>
                     <material>
-                        <ambient>0.000 1.000 0.991 1</ambient>
-                        <diffuse>0.000 1.000 0.991 1</diffuse>
+                        <ambient>0.200 0.000 1.000 1</ambient>
+                        <diffuse>0.200 0.000 1.000 1</diffuse>
                     </material>
                 </visual>
                 <collision name='collision'>
@@ -343,7 +343,7 @@
             </link>
         </model>
 
-        <model name='landmark_8_color_041'>
+        <model name='landmark_8_color_144'>
             <static>true</static>
             <pose>6.872 -9.703 0.500 0 0 0</pose>
             <link name='link'>
@@ -355,8 +355,8 @@
                         </cylinder>
                     </geometry>
                     <material>
-                        <ambient>1.000 0.699 0.000 1</ambient>
-                        <diffuse>1.000 0.699 0.000 1</diffuse>
+                        <ambient>0.800 0.000 1.000 1</ambient>
+                        <diffuse>0.800 0.000 1.000 1</diffuse>
                     </material>
                 </visual>
                 <collision name='collision'>
@@ -370,7 +370,7 @@
             </link>
         </model>
 
-        <model name='landmark_9_color_264'>
+        <model name='landmark_9_color_162'>
             <static>true</static>
             <pose>-4.335 -13.472 0.500 0 0 0</pose>
             <link name='link'>
@@ -382,8 +382,8 @@
                         </cylinder>
                     </geometry>
                     <material>
-                        <ambient>0.407 0.000 1.000 1</ambient>
-                        <diffuse>0.407 0.000 1.000 1</diffuse>
+                        <ambient>1.000 0.000 0.600 1</ambient>
+                        <diffuse>1.000 0.000 0.600 1</diffuse>
                     </material>
                 </visual>
                 <collision name='collision'>
@@ -495,10 +495,10 @@
                     <update_rate>10</update_rate>
                     <topic>camera/image</topic>
                     <camera>
-                        <horizontal_fov>1.0472</horizontal_fov>
+                        <horizontal_fov>1.085</horizontal_fov>
                         <image>
-                            <width>320</width>
-                            <height>240</height>
+                            <width>1280</width>
+                            <height>720</height>
                             <format>R8G8B8</format>
                         </image>
                         <clip><near>0.1</near><far>100</far></clip>
