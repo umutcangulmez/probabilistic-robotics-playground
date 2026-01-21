@@ -35,6 +35,7 @@ setup(
             'keyboard_teleop = visual_inertial_nav_es_ekf.keyboard_teleop:main',
             'velocity_smoother = visual_inertial_nav_es_ekf.velocity_smoother:main',
             'data_logger = visual_inertial_nav_es_ekf.data_logger:main',
+            'trajectory_publisher = visual_inertial_nav_es_ekf.trajectory_publisher:main'
         ],
     },
 )
