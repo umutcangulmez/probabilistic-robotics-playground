@@ -1,0 +1,2 @@
+Experiment,Duration (s),RMSE (m),Avg NEES,Max Error (m),Visual Updates,Consistent
+imu_vision_10lm_8_shape_1,94.2,0.6960,28.53,3.8090,1646,No

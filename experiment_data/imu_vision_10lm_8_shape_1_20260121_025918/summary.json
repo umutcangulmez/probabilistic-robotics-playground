@@ -1,0 +1,9 @@
+{
+  "experiment_name": "imu_vision_10lm_8_shape_1",
+  "duration_sec": 94.18,
+  "ekf_samples": 4337,
+  "gt_samples": 2000,
+  "visual_updates": 1646,
+  "final_rmse": 0.6959292964346154,
+  "final_nees": 23.48171862206531
+}

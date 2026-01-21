@@ -1,0 +1,9 @@
+{
+  "experiment_name": "imu_only_10lm_8_shape_1",
+  "duration_sec": 97.928,
+  "ekf_samples": 5169,
+  "gt_samples": 2046,
+  "visual_updates": 0,
+  "final_rmse": 9.807431257689625,
+  "final_nees": 0.0720610892335725
+}

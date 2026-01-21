@@ -1,0 +1,2 @@
+Experiment,Duration (s),RMSE (m),Avg NEES,Max Error (m),Visual Updates,Consistent
+imu_only_10lm_square_2,133.9,13.0377,0.28,23.5099,0,Yes
