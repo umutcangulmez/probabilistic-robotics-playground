@@ -36,7 +36,7 @@ def generate_launch_description():
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('enable_smoother', default_value='true'),
         DeclareLaunchArgument('enable_teleop', default_value='false'),
-        DeclareLaunchArgument('enable_visual', default_value='false'),
+        DeclareLaunchArgument('enable_visual', default_value='true'),
 
         # ================================================================
         # 2) Gazebo <-> ROS 2 Bridge
