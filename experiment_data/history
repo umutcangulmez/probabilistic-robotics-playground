@@ -1,0 +1,4 @@
+   55  sudo apt install python3-pip -y
+   56  pip3 install pandas matplotlib numpy
+   57  python3 ~/ros2_ws/src/visual_inertial_nav_es_ekf/scripts/visualize_results.py --data ~/ros2_ws/experiment_data/imu_vision_10lm_20260120_132101     --landmarks ~/ros2_ws/src/visual_inertial_nav_es_ekf/scripts/landmarks.json
+   58  pip3 install "numpy<2" --force-reinstall
