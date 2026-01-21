@@ -50,3 +50,13 @@ ros2 run visual_inertial_nav_es_ekf trajectory_publisher --ros-args \
 ```
 
 
+
+
+# Helpers
+
+ros2 launch visual_inertial_nav_es_ekf visual_inertial_nav_es_ekf.py
+ros2 run visual_inertial_nav_es_ekf data_logger --ros-args -p experiment_name:=imu_vision_10lm_square_1
+ros2 run visual_inertial_nav_es_ekf trajectory_publisher --ros-args     -p trajectory:=square -p loops:=2
+~/ros2_ws/src/visual_inertial_nav_es_ekf/scripts# ign gazebo -r project_world.sdf
+ros2 launch foxglove_bridge foxglove_bridge_launch.xml
+ros2 run rqt_image_view rqt_image_view /visual_detector/debug_image
