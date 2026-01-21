@@ -12,6 +12,7 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time')
     enable_smoother = LaunchConfiguration('enable_smoother')
     enable_teleop = LaunchConfiguration('enable_teleop')
+    enable_visual = LaunchConfiguration('enable_visual')
 
     ROBOT_NAME = 'turtlebot3_waffle'
 
@@ -35,6 +36,7 @@ def generate_launch_description():
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('enable_smoother', default_value='true'),
         DeclareLaunchArgument('enable_teleop', default_value='false'),
+        DeclareLaunchArgument('enable_visual', default_value='false'),
 
         # ================================================================
         # 2) Gazebo <-> ROS 2 Bridge
@@ -117,6 +119,7 @@ def generate_launch_description():
             package='visual_inertial_nav_es_ekf',
             executable='visual_detector',
             name='visual_detector',
+            condition=IfCondition(enable_visual),
             parameters=[{
                 'use_sim_time': use_sim_time,
                 'mode': 'color',  # 'color' or 'aruco'
